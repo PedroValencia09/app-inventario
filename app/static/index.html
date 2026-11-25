@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Inventario - Neon Cloud</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 font-sans text-slate-800">
+
+    <!-- PANTALLA DE LOGIN / REGISTRO (JWT) -->
+    <div id="auth-container" class="min-h-screen flex items-center justify-center p-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 w-full max-w-md">
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold text-slate-900">📦 Control de Inventario</h1>
+                <p class="text-sm text-slate-500 mt-1">Acceso seguro con JWT</p>
+            </div>
+
+            <!-- Pestañas -->
+            <div class="flex border-b border-slate-100 mb-6 text-sm font-semibold">
+                <button type="button" onclick="cambiarTab('login')" id="btn-tab-login" class="w-1/2 pb-2 border-b-2 border-indigo-600 text-indigo-600">
+                    Iniciar Sesión
+                </button>
+                <button type="button" onclick="cambiarTab('registro')" id="btn-tab-registro" class="w-1/2 pb-2 text-slate-400 hover:text-slate-600">
+                    Crear Cuenta
+                </button>
+            </div>
+
+            <!-- Formulario Login -->
+            <form id="form-login" class="space-y-4">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Usuario</label>
+                    <input type="text" id="login_username" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Contraseña</label>
+                    <input type="password" id="login_password" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-xl text-sm transition shadow-sm">
+                    Entrar al Sistema
+                </button>
+            </form>
+
+            <!-- Formulario Registro -->
+            <form id="form-registro" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Nuevo Usuario</label>
+                    <input type="text" id="reg_username" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Contraseña</label>
+                    <input type="password" id="reg_password" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Rol en el Sistema</label>
+                    <select id="reg_rol" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+                        <option value="almacenista">Almacenista (Consulta y Movimientos)</option>
+                        <option value="administrador">Administrador (Control Total)</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-xl text-sm transition shadow-sm">
+                    Registrar Usuario
+                </button>
+            </form>
+
+            <div id="msg-auth" class="mt-4 text-xs text-center font-medium"></div>
+        </div>
+    </div>
+
+    <!-- PANEL PRINCIPAL -->
+    <div id="app-container" class="hidden max-w-7xl mx-auto p-6">
+        <!-- Encabezado -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900">📦 Control de Inventario</h1>
+                <p class="text-sm text-slate-500">Base de datos en la nube (Neon PostgreSQL)</p>
+            </div>
+            
+            <div class="flex flex-wrap items-center gap-3">
+                <div id="badge-alerta" class="hidden bg-red-100 text-red-700 px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2">
+                    ⚠️ ¡Hay productos con stock bajo!
+                </div>
+
+                <!-- Info de Usuario y Rol -->
+                <div class="bg-slate-100 px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-2">
+                    👤 <span id="info-usuario"></span>
+                    <span id="info-rol" class="uppercase px-2 py-0.5 rounded-md text-[10px] font-bold"></span>
+                </div>
+
+                <button onclick="cerrarSesion()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold transition">
+                    Cerrar Sesión
+                </button>
+            </div>
+        </header>
+
+        <!-- Grid Principal -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Columna Izquierda: Tabla de Productos -->
+            <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col">
+                <h2 class="text-lg font-semibold mb-4 text-slate-800">Inventario Actual</h2>
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-xs text-slate-400 uppercase tracking-wider">
+                                <th class="pb-3">ID / Producto</th>
+                                <th class="pb-3">Categoría</th>
+                                <th class="pb-3">Proveedor</th>
+                                <th class="pb-3">Stock</th>
+                                <th class="pb-3">Precio</th>
+                                <th class="pb-3">Último Movimiento</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-productos" class="divide-y divide-slate-100 text-sm">
+                            <!-- Dinámico -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Formularios de Gestión -->
+            <div class="space-y-6">
+                
+                <!-- Registrar Movimiento (Visible para Administrador y Almacenista) -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <h2 class="text-base font-semibold mb-3 text-slate-800">🔄 Registrar Movimiento</h2>
+                    <form id="form-movimiento" class="space-y-3">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">ID Producto</label>
+                                <input type="number" min="1" id="mov_id_producto" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Tipo</label>
+                                <select id="tipo_movimiento" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+                                    <option value="ENTRADA">ENTRADA</option>
+                                    <option value="SALIDA">SALIDA</option>
+                                    <option value="AJUSTE">AJUSTE</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Cantidad</label>
+                                <input type="number" id="cantidad" min="1" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Motivo</label>
+                                <input type="text" id="motivo" placeholder="Ej. Venta" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-xl text-xs transition shadow-sm">
+                            Guardar Movimiento
+                        </button>
+                    </form>
+                    <div id="msg-movimiento" class="mt-2 text-xs text-center font-medium"></div>
+                </div>
+
+                <!-- SECCIÓN SOLO ADMINISTRADOR: Productos, Categorías y Proveedores -->
+                <div id="seccion-admin" class="hidden space-y-6">
+
+                    <!-- Nuevo Producto -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <h2 class="text-base font-semibold text-slate-800">➕ Nuevo Producto</h2>
+                            <span class="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">Solo Admin</span>
+                        </div>
+                        <form id="form-producto" class="space-y-3">
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="text" id="prod_nombre" placeholder="Nombre" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                                <input type="text" id="prod_codigo" placeholder="Código Barras" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <select id="prod_categoria" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white outline-none">
+                                    <option value="">Selecciona Categoría</option>
+                                </select>
+                                <select id="prod_proveedor" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white outline-none">
+                                    <option value="">Selecciona Proveedor</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <input type="number" min="0.00" step="0.01" id="prod_pcompra" placeholder="P. Compra" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                                <input type="number" min="0.00" step="0.01" id="prod_pventa" placeholder="P. Venta" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                                <input type="number" min="0" id="prod_stock" placeholder="Stock" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                            </div>
+                            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-xl text-xs transition shadow-sm">
+                                Registrar Producto
+                            </button>
+                        </form>
+                        <div id="msg-producto" class="mt-2 text-xs text-center font-medium"></div>
+                    </div>
+
+                    <!-- Nueva Categoría -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <h2 class="text-base font-semibold text-slate-800">🏷️ Nueva Categoría</h2>
+                            <span class="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">Solo Admin</span>
+                        </div>
+                        <form id="form-categoria" class="flex gap-2">
+                            <input type="text" id="cat_nombre" placeholder="Ej. Electrónica, Papelería..." required class="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                            <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white font-medium px-4 py-2 rounded-xl text-xs transition shadow-sm">
+                                Agregar
+                            </button>
+                        </form>
+                        <div id="msg-categoria" class="mt-2 text-xs text-center font-medium"></div>
+                    </div>
+
+                    <!-- Nuevo Proveedor -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <h2 class="text-base font-semibold text-slate-800">🚚 Nuevo Proveedor</h2>
+                            <span class="text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">Solo Admin</span>
+                        </div>
+                        <form id="form-proveedor" class="space-y-3">
+                            <input type="text" id="prov_empresa" placeholder="Nombre de la Empresa *" required class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="text" id="prov_contacto" placeholder="Contacto (Opcional)" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                                <input type="text" id="prov_telefono" placeholder="Teléfono (Opcional)" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                                <input type="email" id="prov_email" placeholder="Correo (Opcional)" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                                <input type="text" id="prov_direccion" placeholder="Dirección (Opcional)" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none">
+                            </div>
+                            <button type="submit" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-2 rounded-xl text-xs transition shadow-sm">
+                                Guardar Proveedor
+                            </button>
+                        </form>
+                        <div id="msg-proveedor" class="mt-2 text-xs text-center font-medium"></div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de Integración con JWT -->
+    <script>
+        const API_URL = "http://127.0.0.1:8003";
+
+        function cambiarTab(tab) {
+            document.getElementById("msg-auth").innerText = "";
+            if (tab === 'login') {
+                document.getElementById("form-login").classList.remove("hidden");
+                document.getElementById("form-registro").classList.add("hidden");
+                document.getElementById("btn-tab-login").className = "w-1/2 pb-2 border-b-2 border-indigo-600 text-indigo-600";
+                document.getElementById("btn-tab-registro").className = "w-1/2 pb-2 text-slate-400 hover:text-slate-600";
+            } else {
+                document.getElementById("form-login").classList.add("hidden");
+                document.getElementById("form-registro").classList.remove("hidden");
+                document.getElementById("btn-tab-registro").className = "w-1/2 pb-2 border-b-2 border-emerald-600 text-emerald-600";
+                document.getElementById("btn-tab-login").className = "w-1/2 pb-2 text-slate-400 hover:text-slate-600";
+            }
+        }
+
+        document.getElementById("form-registro").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById("msg-auth");
+            try {
+                const res = await fetch(`${API_URL}/auth/registro`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        username: document.getElementById("reg_username").value,
+                        password: document.getElementById("reg_password").value,
+                        rol: document.getElementById("reg_rol").value
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    msg.className = "mt-4 text-xs text-center font-medium text-emerald-600";
+                    msg.innerText = "✅ Usuario creado con éxito. Ahora inicia sesión.";
+                    document.getElementById("form-registro").reset();
+                    setTimeout(() => cambiarTab('login'), 1200);
+                } else {
+                    msg.className = "mt-4 text-xs text-center font-medium text-red-600";
+                    msg.innerText = data.detail || "Error al registrar usuario";
+                }
+            } catch (err) {
+                msg.className = "mt-4 text-xs text-center font-medium text-red-600";
+                msg.innerText = "Error de conexión con el servidor";
+            }
+        });
+
+        document.getElementById("form-login").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById("msg-auth");
+            const formData = new URLSearchParams();
+            formData.append("username", document.getElementById("login_username").value);
+            formData.append("password", document.getElementById("login_password").value);
+
+            try {
+                const res = await fetch(`${API_URL}/auth/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: formData
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem("jwt_token", data.access_token);
+                    localStorage.setItem("user_rol", data.rol);
+                    localStorage.setItem("user_name", data.username);
+                    document.getElementById("form-login").reset();
+                    verificarSesion();
+                } else {
+                    msg.className = "mt-4 text-xs text-center font-medium text-red-600";
+                    msg.innerText = data.detail || "Usuario o contraseña incorrectos";
+                }
+            } catch (err) {
+                msg.className = "mt-4 text-xs text-center font-medium text-red-600";
+                msg.innerText = "Error de conexión con el servidor";
+            }
+        });
+
+        function cerrarSesion() {
+            localStorage.removeItem("jwt_token");
+            localStorage.removeItem("user_rol");
+            localStorage.removeItem("user_name");
+            verificarSesion();
+        }
+
+        function getAuthHeaders() {
+            const token = localStorage.getItem("jwt_token");
+            return {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            };
+        }
+
+        async function verificarSesion() {
+            const token = localStorage.getItem("jwt_token");
+            const rol = localStorage.getItem("user_rol");
+            const username = localStorage.getItem("user_name");
+
+            if (!token) {
+                document.getElementById("auth-container").classList.remove("hidden");
+                document.getElementById("app-container").classList.add("hidden");
+                return;
+            }
+
+            document.getElementById("auth-container").classList.add("hidden");
+            document.getElementById("app-container").classList.remove("hidden");
+
+            document.getElementById("info-usuario").innerText = username;
+            const badgeRol = document.getElementById("info-rol");
+            badgeRol.innerText = rol;
+
+            if (rol === "administrador") {
+                badgeRol.className = "uppercase px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700";
+                document.getElementById("seccion-admin").classList.remove("hidden");
+            } else {
+                badgeRol.className = "uppercase px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-700";
+                document.getElementById("seccion-admin").classList.add("hidden");
+            }
+
+            await inicializar();
+        }
+
+        async function inicializar() {
+            await cargarDatos();
+            await cargarSelects();
+        }
+
+        function obtenerBadgeMovimiento(tipo) {
+            if (!tipo) return '<span class="text-xs text-slate-400">Sin movimientos</span>';
+            
+            const t = tipo.toUpperCase();
+            if (t === 'ENTRADA') {
+                return '<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-700">ENTRADA</span>';
+            } else if (t === 'SALIDA') {
+                return '<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-red-100 text-red-700">SALIDA</span>';
+            } else if (t === 'AJUSTE') {
+                return '<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-700">AJUSTE</span>';
+            }
+            return `<span class="text-xs text-slate-600">${tipo}</span>`;
+        }
+
+        async function cargarDatos() {
+            try {
+                const res = await fetch(`${API_URL}/productos`, { headers: getAuthHeaders() });
+                if (res.status === 401) return cerrarSesion();
+
+                const data = await res.json();
+                const tbody = document.getElementById("tabla-productos");
+                tbody.innerHTML = "";
+
+                if (data.productos) {
+                    data.productos.forEach(p => {
+                        const stockClass = p.stock_actual <= p.stock_minimo ? 'text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-md' : 'text-slate-700';
+                        const tipoMov = p.ultimo_movimiento || p.tipo_movimiento;
+
+                        tbody.innerHTML += `
+                            <tr class="hover:bg-slate-50/50">
+                                <td class="py-3 font-medium text-slate-900">#${p.id_producto}<br><span class="text-xs text-slate-400 font-normal">${p.producto}</span></td>
+                                <td class="py-3 text-slate-500 text-xs">${p.categoria || 'N/D'}</td>
+                                <td class="py-3 text-slate-500 text-xs">${p.proveedor || 'N/D'}</td>
+                                <td class="py-3"><span class="${stockClass}">${p.stock_actual}</span></td>
+                                <td class="py-3 text-slate-600 text-xs">$${p.precio_venta}</td>
+                                <td class="py-3">${obtenerBadgeMovimiento(tipoMov)}</td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                const resAlertas = await fetch(`${API_URL}/productos/alertas`, { headers: getAuthHeaders() });
+                const dataAlertas = await resAlertas.json();
+                if (dataAlertas.alertas_stock && dataAlertas.alertas_stock.length > 0) {
+                    document.getElementById("badge-alerta").classList.remove("hidden");
+                } else {
+                    document.getElementById("badge-alerta").classList.add("hidden");
+                }
+            } catch (err) {
+                console.error("Error cargando inventario:", err);
+            }
+        }
+
+        async function cargarSelects() {
+            try {
+                const resCat = await fetch(`${API_URL}/categorias`, { headers: getAuthHeaders() });
+                const dataCat = await resCat.json();
+                const selectCat = document.getElementById("prod_categoria");
+                selectCat.innerHTML = '<option value="">Categoría</option>';
+                if (dataCat.categorias) {
+                    dataCat.categorias.forEach(c => {
+                        selectCat.innerHTML += `<option value="${c.id_categoria}">${c.nombre}</option>`;
+                    });
+                }
+
+                const resProv = await fetch(`${API_URL}/proveedores`, { headers: getAuthHeaders() });
+                const dataProv = await resProv.json();
+                const selectProv = document.getElementById("prod_proveedor");
+                selectProv.innerHTML = '<option value="">Proveedor</option>';
+                if (dataProv.proveedores) {
+                    dataProv.proveedores.forEach(p => {
+                        selectProv.innerHTML += `<option value="${p.id_proveedor}">${p.nombre_empresa}</option>`;
+                    });
+                }
+            } catch (err) {
+                console.error("Error cargando selects:", err);
+            }
+        }
+
+        // Manejar Movimiento
+        document.getElementById("form-movimiento").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const payload = {
+                id_producto: parseInt(document.getElementById("mov_id_producto").value),
+                tipo_movimiento: document.getElementById("tipo_movimiento").value,
+                cantidad: parseInt(document.getElementById("cantidad").value),
+                motivo: document.getElementById("motivo").value
+            };
+            const msg = document.getElementById("msg-movimiento");
+            
+            try {
+                const res = await fetch(`${API_URL}/movimientos`, {
+                    method: "POST",
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    msg.className = "mt-2 text-xs text-center font-medium text-emerald-600";
+                    msg.innerText = "¡Registrado con éxito!";
+                    document.getElementById("form-movimiento").reset();
+                    inicializar();
+                } else {
+                    msg.className = "mt-2 text-xs text-center font-medium text-red-600";
+                    msg.innerText = data.detail || "Error";
+                }
+            } catch (err) {
+                msg.className = "mt-2 text-xs text-center font-medium text-red-600";
+                msg.innerText = "Error al conectar con el servidor";
+            }
+        });
+
+        // Manejar Nuevo Producto
+        document.getElementById("form-producto").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const payload = {
+                codigo_barras: document.getElementById("prod_codigo").value,
+                nombre: document.getElementById("prod_nombre").value,
+                id_categoria: document.getElementById("prod_categoria").value ? parseInt(document.getElementById("prod_categoria").value) : null,
+                id_proveedor: document.getElementById("prod_proveedor").value ? parseInt(document.getElementById("prod_proveedor").value) : null,
+                precio_compra: parseFloat(document.getElementById("prod_pcompra").value),
+                precio_venta: parseFloat(document.getElementById("prod_pventa").value),
+                stock_actual: parseInt(document.getElementById("prod_stock").value)
+            };
+            const msg = document.getElementById("msg-producto");
+
+            try {
+                const res = await fetch(`${API_URL}/productos`, {
+                    method: "POST",
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    msg.className = "mt-2 text-xs text-center font-medium text-emerald-600";
+                    msg.innerText = "¡Producto dado de alta!";
+                    document.getElementById("form-producto").reset();
+                    inicializar();
+                } else {
+                    msg.className = "mt-2 text-xs text-center font-medium text-red-600";
+                    msg.innerText = data.detail || "Error";
+                }
+            } catch (err) {
+                msg.className = "mt-2 text-xs text-center font-medium text-red-600";
+                msg.innerText = "Error al conectar con el servidor";
+            }
+        });
+
+        // Manejar Nueva Categoría
+        document.getElementById("form-categoria").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById("msg-categoria");
+            try {
+                const res = await fetch(`${API_URL}/categorias`, {
+                    method: "POST",
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ nombre: document.getElementById("cat_nombre").value })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    msg.className = "mt-2 text-xs text-center font-medium text-emerald-600";
+                    msg.innerText = "✅ Categoría agregada";
+                    document.getElementById("form-categoria").reset();
+                    await cargarSelects();
+                } else {
+                    msg.className = "mt-2 text-xs text-center font-medium text-red-600";
+                    msg.innerText = data.detail || "Error";
+                }
+            } catch (err) {
+                msg.className = "mt-2 text-xs text-center font-medium text-red-600";
+                msg.innerText = "Error de conexión";
+            }
+        });
+
+        // Manejar Nuevo Proveedor
+        document.getElementById("form-proveedor").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById("msg-proveedor");
+            try {
+                const res = await fetch(`${API_URL}/proveedores`, {
+                    method: "POST",
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({
+                        nombre_empresa: document.getElementById("prov_empresa").value,
+                        contacto: document.getElementById("prov_contacto").value || null,
+                        telefono: document.getElementById("prov_telefono").value || null,
+                        email: document.getElementById("prov_email").value || null,
+                        direccion: document.getElementById("prov_direccion").value || null
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    msg.className = "mt-2 text-xs text-center font-medium text-emerald-600";
+                    msg.innerText = "✅ Proveedor guardado";
+                    document.getElementById("form-proveedor").reset();
+                    await cargarSelects();
+                } else {
+                    msg.className = "mt-2 text-xs text-center font-medium text-red-600";
+                    msg.innerText = data.detail || "Error";
+                }
+            } catch (err) {
+                msg.className = "mt-2 text-xs text-center font-medium text-red-600";
+                msg.innerText = "Error de conexión";
+            }
+        });
+
+        verificarSesion();
+    </script>
+</body>
+</html>
